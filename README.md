@@ -4,7 +4,11 @@ Anything that is often repeated can be turned into a function. This is not only 
 
 # Development Process
 Write MATLAB functions '*function*.m' that are as robust and universal as possible.
+
 Make sure the descriptions are accurate and clear enough to allow anybody to use the function.
+
 Once the '.m' function has been written we can save it in the 'DevFunctions' folder, this allows edits to be made if necessary.
+
 If you are happy with the function, you can obsfuscate it in MATLAB by running pcode('*function*').
-The resulting obsfucated function '*function*.p' can be uploaded into the 'FinalFunction' folder
+
+The resulting obsfucated function '*function*.p' can be uploaded into the 'Functions' folder.
