@@ -28,7 +28,7 @@ elseif numCols == 11 % FIRMWARE 190205 (beta)
     dataArray2 = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'TextType', 'string', 'EmptyValue', NaN,  'ReturnOnError', false);
 elseif numCols == 9 %FIRMWARE 190307
     disp ('Firmware version: 190307')
-    formatSpec = '%f%*s%f%f%f%f%*s%*s%*s%*s%*s%[^\n\r]';
+    formatSpec = '%*s%f%*s%f%f%f%f%*s%*s%*s%*s%*s%[^\n\r]';
     dataArray2 = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'TextType', 'string', 'EmptyValue', NaN,  'ReturnOnError', false);
 end
 fclose(fileID);
