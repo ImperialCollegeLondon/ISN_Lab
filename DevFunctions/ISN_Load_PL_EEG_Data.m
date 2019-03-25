@@ -16,7 +16,6 @@ end
 % dataArray
 delimiter = ',';
 fileID = fopen(tmp_filename,'r');
-fgets(fileID)
 topline = fgets(fileID);
 numCols = numel(strfind(topline,delimiter)) + 1;
 if numCols == 7 % FIRMWARE 181210
