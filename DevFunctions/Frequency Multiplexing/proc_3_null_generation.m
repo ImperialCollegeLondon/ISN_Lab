@@ -10,10 +10,14 @@ load(['sleep_multiplex_',char(regexp(filename,'[0-9]','match')),'.mat']);
 
 %% Single-Epoch Randomisation
 f_width = 1;
+N = 1000; % number of randomisation
 
 tol = 0.03;
 
 num_bins = floor(max(eeg_psd.freq)/f_width)+1;
+
+shuffle_triplet_count = zeros(eeg_multiplex.nc,eeg_multiplex.nepc);
+shuffle_triplet_mean = zeros(eeg_multiplex.nc,N);
 
 % cells of peak positions
 pks_list = cell(eeg_psd.nc,num_bins);
@@ -48,51 +52,53 @@ end
 pks_list_mean = cellfun(@mean, pks_list);
 pks_list_std = cellfun(@std, pks_list);
 
-generated_epochs = cell(eeg_psd.nc,eeg_psd.nepc);
-for ch = 1:eeg_multiplex.nc
-    for epch = 1:eeg_multiplex.nepc
-        generated_epochs{ch,epch} = zeros(1,eeg_psd.npks(ch,epch));
-        
-        pk_idx = 1;
-        
-        % generating random epochs
-        for pk = 1:num_bins
-            if pks_count{ch,epch}(pk)
-                for i = 1:pks_count{ch,epch}(pk)
-                    
-                    rand_pk = randi(length(pks_list{ch,pk}),1);
-                    
-                    if pks_unique
-                        while pks_used{ch,pk}(rand_pk)
-                            rand_pk = randi(length(pks_list{ch,pk}),1);
+for i = 1:N
+    if mod(i,10) == 0
+        fprintf("Running iteration %d\n", i)
+    end
+    
+    pks_used = cellfun(@(x) zeros(1,length(x)), pks_used, 'un', false);
+    generated_epochs = cell(eeg_psd.nc,eeg_psd.nepc);
+    for ch = 1:eeg_multiplex.nc
+        for epch = 1:eeg_multiplex.nepc
+            generated_epochs{ch,epch} = zeros(1,eeg_psd.npks(ch,epch));
+            
+            pk_idx = 1;
+            
+            % generating random epochs
+            for pk = 1:num_bins
+                if pks_count{ch,epch}(pk)
+                    for j = 1:pks_count{ch,epch}(pk)
+                        
+                        rand_pk = randi(length(pks_list{ch,pk}),1);
+                        
+                        if pks_unique
+                            while pks_used{ch,pk}(rand_pk)
+                                rand_pk = randi(length(pks_list{ch,pk}),1);
+                            end
                         end
+                        
+                        generated_epochs{ch,epch}(pk_idx) = pks_list{ch,pk}(rand_pk);
+                        pks_used{ch,pk}(rand_pk) = true;
+                        pk_idx = pk_idx + 1;
                     end
-                    
-                    generated_epochs{ch,epch}(pk_idx) = pks_list{ch,pk}(rand_pk);
-                    pks_used{ch,pk}(rand_pk) = true;
-                    pk_idx = pk_idx + 1;
                 end
             end
+            
+            % find multiplexing
+            [triplet_count, ~, ~, ~] = multiplex_find(generated_epochs{ch,epch},generated_epochs{ch,epch}, tol, max(eeg_psd.freq), 3);
+            
+            % get triplet count for epoch            
+            shuffle_triplet_count(ch,epch) = sum(triplet_count);
+                      
         end
-        
-        % find multiplexing
-        [triplet_count, triplet_component, harmonic_count, harmonic_component] = multiplex_find(generated_epochs{ch,epch},generated_epochs{ch,epch}, tol, max(eeg_psd.freq), 3);
-        
-        % saving data into structure
-        shuffle_multiplex.triplet_count{ch,epch} = [generated_epochs{ch,epch}' triplet_count'];
-        % eeg_multiplex.diff_count{ch,epch} = [eeg_psd.pks_freq{ch,epch} pks_diff_count'];
-        shuffle_multiplex.triplet_component{ch,epch} = [num2cell(generated_epochs{ch,epch}') triplet_component];
-        % eeg_multiplex.diff_contribution{ch,epch} = [num2cell(eeg_psd.pks_freq{ch,epch}) pks_diff_contribution];
-        
     end
+    
+    % generate mean triplet count per channel per iteration
+    shuffle_triplet_mean(:,i) = mean(shuffle_triplet_count,2);  
 end
 
 %% Single-epoch Randmoisation analysis
-
-shuffle_triplet = cellfun(@(x) sum(x(:,2)), shuffle_multiplex.triplet_count,'un', false);
-shuffle_triplet = cell2mat(shuffle_triplet);
-shuffle_triplet_mean = mean(shuffle_triplet,2);
-shuffle_triplet_std = std(shuffle_triplet,0,2);
 
 actual_triplet = cellfun(@(x) sum(x(:,2)), eeg_multiplex.triplet_count,'un', false);
 actual_triplet = cell2mat(actual_triplet);
