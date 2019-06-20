@@ -29,14 +29,13 @@ normalized_psd_to_total_power = 1;
 y_eeg = eeg.data;
 Fs = eeg.Fs;
 num_epochs = length(eeg.ep_onset);
-if length(eeg.ep_sz) > 1
+if length(eeg.ep_sz) > 2
     epoch_idx = arrayfun(@(x,y) x:x+y, eeg.ep_onset,eeg.ep_sz,'uni',false);
 else
     for i = 1:length(eeg.ep_onset)
-        epoch_idx{i} = [eeg.ep_onset(i):eeg.ep_onset(i) + eeg.ep_sz];
+        epoch_idx{i} = [eeg.ep_onset(i):eeg.ep_onset(i) + eeg.ep_sz(1)];
     end
 end
-epoch_idx{end} = [eeg.ep_onset(end):max(size(eeg.data))];
 % excld_epoch = (eeg.scoring == -1);
 
 %limit freq span

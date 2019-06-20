@@ -12,7 +12,7 @@ ch_name = ["Cz","O1","Pz","Fpz"];
 num_channels = length(ch_name);
 
 % epoch size
-ep_sz = 0; % if 0, follow annotation
+ep_sz = 5; % if 0, follow annotation
 
 %% Load eeg data
 % load eeg file
@@ -60,13 +60,17 @@ scoring = annot.annotation;
 % put in stucture
 eeg.scoring = scoring;
 
+eeg.scoring_start = floor(annot.onset(1,1)*Fs)+1;
+eeg.scoring_end = floor(annot.onset(end,1)*Fs+1 + annot.duration(end,1)*Fs);
+
 % epoch of scoring
 if ep_sz == 0
     eeg.ep_sz = floor(annot.duration(:,1) * Fs);
     eeg.ep_onset = floor(annot.onset(:,1)*Fs)+1;
 else
-    eeg.ep_sz = floor(ep_sz * Fs)';
-    eeg.ep_onset = floor([1:ep_sz * Fs: ceil(max(size(eeg.data))/(ep_sz*Fs))*ep_sz * Fs])';
+    eeg.ep_onset = floor([eeg.scoring_start:ep_sz * Fs: eeg.scoring_end])';
+    eeg.ep_sz = [floor(ep_sz * Fs)];
+%     eeg.ep_onset = eeg.ep_onset(1:end-1);    
 end
 
 % %% Plot EEG with Score Colouring
