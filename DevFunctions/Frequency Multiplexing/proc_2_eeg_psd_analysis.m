@@ -3,14 +3,14 @@ close all
 clc
 
 %% Read Data
-filename = 'eeg_3.mat';
+filename = 'eeg_1.mat';
 load(filename);
 
 %% Modify Epoch Size
 ep_sz = 5;
 
-eeg.ep_sz = floor(ep_sz * eeg.Fs)';
-eeg.ep_onset = floor([1:ep_sz * eeg.Fs: ceil(max(size(eeg.data))/(ep_sz*eeg.Fs))*ep_sz * eeg.Fs])';
+eeg.ep_onset = floor([eeg.scoring_start:ep_sz * eeg.Fs: eeg.scoring_end])';
+eeg.ep_sz = [floor(ep_sz * eeg.Fs)];
 
 %% Compute PSD
 cmp_psd = 1;
@@ -112,6 +112,11 @@ eeg_multiplex.nepc = eeg_psd.nepc;
 eeg_multiplex.npks = eeg_psd.npks;
 eeg_multiplex.channels = eeg_psd.channels;
 
+%% Duo-epoch Multiplexing Analysis
+
+eeg_multiplex = duoEpochMultiplex(eeg_multiplex,eeg_multiplex.nc,eeg_multiplex.nepc,eeg_psd.pks_freq, max(eeg_psd.freq));
+
+
 %% Cleanup variables
 clearvars -except eeg* ch_* epch_* filename
 
@@ -135,7 +140,3 @@ for i=1:length(eeg_multiplex.pks_freq{ch,epch})
 end
 hold off
 set(gca, 'YScale', 'log')
-
-%% Duo-epoch Multiplexing Analysis
-
-eeg_multiplex = duoEpochMultiplex(eeg_multiplex,eeg_multiplex.nc,eeg_multiplex.nepc,eeg_psd.pks_freq, max(eeg_psd.freq));
