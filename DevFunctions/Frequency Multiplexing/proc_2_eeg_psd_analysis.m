@@ -142,4 +142,4 @@ hold off
 set(gca, 'YScale', 'log')
 
 xlabel('Frequency (Hz)');
-ylabel('log(Power) (log(db/Hz))');
+ylabel('Power (db/Hz)');
