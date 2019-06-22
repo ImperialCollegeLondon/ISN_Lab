@@ -3,9 +3,9 @@ close all
 clc
 
 %% user input
-sbjct_num = 3;
-filename = '01-02-0003 PSG.edf';
-filename_annotation = '01-02-0003 Base.edf';
+sbjct_num = 1;
+filename = '01-02-0001 PSG.edf';
+filename_annotation = '01-02-0001 Base.edf';
 
 % ch_to_use = [9, 16, 17, 22];    % Cz, O1, Pz, Fpz
 ch_name = ["Cz","O1","Pz","Fpz"];
