@@ -100,10 +100,20 @@ end
 
 %% Single-epoch Randmoisation analysis
 
+shuffle_triplet_mean_mean = mean(shuffle_triplet_mean,2);
+shuffle_triplet_mean_std = std(shuffle_triplet_mean,0,2);
+
 actual_triplet = cellfun(@(x) sum(x(:,2)), eeg_multiplex.triplet_count,'un', false);
 actual_triplet = cell2mat(actual_triplet);
 actual_triplet_mean = mean(actual_triplet,2);
 actual_triplet_std = std(actual_triplet,0,2);
+
+% t-test with alpha = 0.01
+for i = 1:eeg_multiplex.nc
+    [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet(i,:),shuffle_triplet_mean_mean(i),'Alpha',0.01,'Tail','right');
+end
+
+eeg_multiplex.ttest = ttest_result;
 
 %% Duo-epoch Randomisation
 N = 1000;
