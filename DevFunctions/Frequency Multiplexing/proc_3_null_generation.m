@@ -142,23 +142,10 @@ for i = 1:N
     
 end
 
-actual_possible_tri_gen_pairs = zeros(eeg_multiplex.nc,eeg_multiplex.nepc);
-
-for ch = 1:eeg_multiplex.nc
-    for epch = 1:eeg_multiplex.nepc
-        combi = combnk(eeg_multiplex.pks_freq{ch,epch},2); % number of pairs
-        
-        actual_possible_tri_gen_pairs(ch, epch) = length(combi);
-    end
-end
-
 shuffled_std_triplet = std(shuffled_mean_triplet,1);
 
 actual_num_triplet = sumCellArray(eeg_multiplex.duo_epoch.sum_count);
 actual_mean_triplet = mean(actual_num_triplet,2);
-
-actual_percent_triplet = actual_num_triplet(:,2:end)./actual_possible_tri_gen_pairs(:,1:end-1);
-actual_percent_triplet = [zeros(4,1) actual_percent_triplet];
 
 %% Utilities functions
 function summed_output = sumCellArray(cArray)
