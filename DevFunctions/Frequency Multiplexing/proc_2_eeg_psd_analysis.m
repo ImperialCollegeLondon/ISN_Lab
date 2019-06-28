@@ -13,7 +13,7 @@ eeg.ep_onset = floor([eeg.scoring_start:ep_sz * eeg.Fs: eeg.scoring_end])';
 eeg.ep_sz = [floor(ep_sz * eeg.Fs)];
 
 %% Compute PSD
-cmp_psd = 1;
+cmp_psd = 0;
 eeg_psd = struct();
 if(cmp_psd)
     eeg_psd = eegSleepScorePSD(eeg);
@@ -50,6 +50,9 @@ end
 close all
 tol = 0.03; %TODO: percentage tolerance
 
+% frequency resolution
+df = round(1./(eeg.ep_sz(1)/eeg.Fs),1,'significant');
+
 max_harmonic = 3;
 
 ch_range = ch_end-ch_start + 1;
@@ -79,6 +82,11 @@ for ch = ch_start:ch_end
         psd_smooth = smooth(eeg_psd.psd{ch}(epch,:),num_psd_smooth_points);
         %         [eeg_psd.pks_amp{ch,epch}, eeg_psd.pks_freq{ch,epch}] = findpeaks(psd_smooth, eeg_psd.freq, 'MinPeakProminence',0.00007,'MinPeakHeight',0.0002);
         [eeg_psd.pks_amp{ch,epch}, eeg_psd.pks_freq{ch,epch}] = findpeaks(psd_smooth, eeg_psd.freq,'threshold',0.0000001, 'MinPeakProminence',0.0001,'MinPeakHeight',0.0001);
+        
+        % snap peak position to 0.05 resolution
+        eeg_psd.pks_freq{ch,epch} = roundNearest(eeg_psd.pks_freq{ch,epch},df);
+        % ensure all peaks are unique
+        eeg_psd.pks_freq{ch,epch} = unique(eeg_psd.pks_freq{ch,epch});
         
         % compute num of peaks
         eeg_psd.npks(ch,epch) = length(eeg_psd.pks_freq{ch,epch});
