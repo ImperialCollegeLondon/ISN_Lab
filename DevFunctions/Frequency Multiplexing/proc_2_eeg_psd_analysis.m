@@ -126,7 +126,7 @@ save(['sleep_psd','_',char(regexp(filename,'[0-9]','match')),'.mat'],'eeg_psd');
 
 %% Peaks visualisation
 ch = 1;
-epch = 1;
+epch = 5;
 num_psd_smooth_points = 10;
 
 psd_smooth = smooth(eeg_psd.psd{ch}(epch,:),num_psd_smooth_points);
@@ -140,3 +140,6 @@ for i=1:length(eeg_multiplex.pks_freq{ch,epch})
 end
 hold off
 set(gca, 'YScale', 'log')
+
+xlabel('Frequency (Hz)');
+ylabel('Power (db/Hz)');

@@ -7,3 +7,5 @@
 *.bz2
 annotations/
 ipf13/
+*.m~
+*.asv
