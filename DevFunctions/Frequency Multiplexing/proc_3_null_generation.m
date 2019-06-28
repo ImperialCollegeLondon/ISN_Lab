@@ -10,47 +10,22 @@ load(['sleep_multiplex_',char(regexp(filename,'[0-9]','match')),'.mat']);
 
 %% Single-Epoch Randomisation
 f_width = 1;
-N = 1000; % number of randomisation
+N = 1000; % number of surrogate epochs to generate
 
-tol = 0.03;
+tol = 0.03; % multiplexing tolerance
 
 num_bins = floor(max(eeg_psd.freq)/f_width)+1;
 
 shuffle_triplet_count = zeros(eeg_multiplex.nc,eeg_multiplex.nepc);
 shuffle_triplet_mean = zeros(eeg_multiplex.nc,N);
 
-% cells of peak positions
-pks_list = cell(eeg_psd.nc,num_bins);
-pks_edge = [0:f_width:max(eeg_psd.freq)+1];
-pks_count = cell(eeg_psd.nc,eeg_psd.nepc);
-
-% if unique peak position is used for each epoch
-pks_unique = true;
-if pks_unique
-    pks_used = cell(eeg_psd.nc,num_bins);
-end
-
-% collect list of peaks positions for each bin
+% find peaks distribution
+pks_list = cell(1,eeg_multiplex.nc);
+prob_dist = cell(1,eeg_multiplex.nc);
 for ch = 1:eeg_multiplex.nc
-    for epch = 1:eeg_multiplex.nepc
-        for pk = 1:num_bins
-            pks_count{ch,epch}(pk) = sum(pks_edge(pk) <= eeg_multiplex.pks_freq{ch,epch} & ...
-                eeg_multiplex.pks_freq{ch,epch} < pks_edge(pk+1));
-            
-            pks_list{ch,pk} =[pks_list{ch,pk}; eeg_multiplex.pks_freq{ch,epch}(...
-                pks_edge(pk) <= eeg_multiplex.pks_freq{ch,epch} & ...
-                eeg_multiplex.pks_freq{ch,epch} < pks_edge(pk+1))];
-            
-            
-            if pks_unique
-                pks_used{ch,pk} = zeros(1,length(pks_list{ch,pk}));
-            end
-        end
-    end
+    pks_list{ch} = cat(1, eeg_multiplex.pks_freq{ch,:});
+    prob_dist{ch} = fitdist(pks_list{ch},'kernel','kernel','epanechnikov','width',0.2);
 end
-
-pks_list_mean = cellfun(@mean, pks_list);
-pks_list_std = cellfun(@std, pks_list);
 
 for i = 1:N
     if mod(i,10) == 0
@@ -146,6 +121,14 @@ shuffled_std_triplet = std(shuffled_mean_triplet,1);
 
 actual_num_triplet = sumCellArray(eeg_multiplex.duo_epoch.sum_count);
 actual_mean_triplet = mean(actual_num_triplet,2);
+
+%% pdf visualisation
+prob_dist = fitdist(pks_list{1},'kernel','kernel','epanechnikov','width',0.2);
+x = min(pks_list{1}):0.05:max(pks_list{1});
+y = pdf(prob_dist,x);
+plot(x,y);
+hold on
+histogram(pks_list{1},'Normalization','pdf');
 
 %% Utilities functions
 function summed_output = sumCellArray(cArray)
