@@ -10,7 +10,7 @@ load(['sleep_multiplex_',char(regexp(filename,'[0-9]','match')),'.mat']);
 
 %% Single-Epoch Randomisation
 f_width = 1;
-N = 1000; % number of surrogate epochs to generate
+N = 10; % number of surrogate epochs to generate
 
 tol = 0.03; % multiplexing tolerance
 
@@ -24,40 +24,24 @@ pks_list = cell(1,eeg_multiplex.nc);
 prob_dist = cell(1,eeg_multiplex.nc);
 for ch = 1:eeg_multiplex.nc
     pks_list{ch} = cat(1, eeg_multiplex.pks_freq{ch,:});
+    % fitting the pdf, width is chosen to best retain shape of the
+    % histogram
     prob_dist{ch} = fitdist(pks_list{ch},'kernel','kernel','epanechnikov','width',0.2);
 end
 
 for i = 1:N
-    if mod(i,10) == 0
+    if mod(i,N/10) == 0
         fprintf("Running iteration %d\n", i)
     end
     
-    pks_used = cellfun(@(x) zeros(1,length(x)), pks_used, 'un', false);
     generated_epochs = cell(eeg_psd.nc,eeg_psd.nepc);
     for ch = 1:eeg_multiplex.nc
         for epch = 1:eeg_multiplex.nepc
             generated_epochs{ch,epch} = zeros(1,eeg_psd.npks(ch,epch));
             
-            pk_idx = 1;
-            
-            % generating random epochs
-            for pk = 1:num_bins
-                if pks_count{ch,epch}(pk)
-                    for j = 1:pks_count{ch,epch}(pk)
-                        
-                        rand_pk = randi(length(pks_list{ch,pk}),1);
-                        
-                        if pks_unique
-                            while pks_used{ch,pk}(rand_pk)
-                                rand_pk = randi(length(pks_list{ch,pk}),1);
-                            end
-                        end
-                        
-                        generated_epochs{ch,epch}(pk_idx) = pks_list{ch,pk}(rand_pk);
-                        pks_used{ch,pk}(rand_pk) = true;
-                        pk_idx = pk_idx + 1;
-                    end
-                end
+            % filling in the epoch
+            for pk = 1:eeg_psd.npks(ch,epch)
+                generated_epochs{ch,epch}(pk) = random(prob_dist{ch});
             end
             
             % find multiplexing
