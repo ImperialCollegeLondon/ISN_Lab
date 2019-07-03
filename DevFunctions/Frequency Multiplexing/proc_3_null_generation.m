@@ -5,18 +5,19 @@ clc
 %% Load psd data
 filename = 'eeg_1.mat';
 
+load(filename);
 load(['sleep_psd','_',char(regexp(filename,'[0-9]','match')),'.mat']);
 load(['sleep_multiplex_',char(regexp(filename,'[0-9]','match')),'.mat']);
 
 %% Single-Epoch Randomisation
 f_width = 1;
-N = 100; % number of surrogate epochs to generate
+N = 1000; % number of surrogate epochs to generate
 
 tol = 0.03; % multiplexing tolerance
 
 num_bins = floor(max(eeg_psd.freq)/f_width)+1;
 
-shuffle_triplet_count = zeros(N,eeg_multiplex.nc,eeg_multiplex.nepc);
+shuffle_triplet_count = zeros(N,eeg_multiplex.nc);
 shuffle_triplet_mean = zeros(N,eeg_multiplex.nc);
 
 % find peaks distribution
@@ -26,50 +27,52 @@ for ch = 1:eeg_multiplex.nc
     pks_list{ch} = cat(1, eeg_multiplex.pks_freq{ch,:});
     % fitting the pdf, width is chosen to best retain shape of the
     % histogram
-    prob_dist{ch} = fitdist(pks_list{ch},'kernel','kernel','epanechnikov','width',0.2);
+    prob_dist{ch} = fitdist(pks_list{ch},'kernel','kernel','normal','width',0.05,'support',[0 30.01]);
 end
 
 % find number of peak distribution
 npks_prob_dist = cell(1, eeg_multiplex.nc);
 for ch = 1:eeg_multiplex.nc
-    npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','kernel','kernel','epanechnikov','width',0.3);
+    npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','kernel','kernel','normal','width',0.1,'support',[min(eeg_psd.npks(ch,:))-1 max(eeg_psd.npks(ch,:))+1]);
+%     npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','gamma');
 end
 
-nc = eeg_multiplex.nc;
-nepc = eeg_multiplex.nepc;
+df = round(1./(eeg.ep_sz(1)/eeg.Fs),1,'significant');
+npks_range = [min(eeg_psd.npks,[],2) max(eeg_psd.npks,[],2)];
 
 parfor i = 1:N
     if mod(i,N/10) == 0
         fprintf("Running iteration %d\n", i)
     end
     
-    generated_epochs = cell(eeg_psd.nc,eeg_psd.nepc);
     for ch = 1:nc
-        for epch = 1:nepc
-            generated_epochs{ch,epch} = zeros(1,eeg_psd.npks(ch,epch));
-            
-            % filling in the epoch
-            for pk = 1:eeg_psd.npks(ch,epch)
-                generated_epochs{ch,epch}(pk) = random(prob_dist{ch});
-            end
-            
-            % find multiplexing
-            [triplet_count, ~, ~, ~] = multiplex_find(generated_epochs{ch,epch},generated_epochs{ch,epch}, tol, max(eeg_psd.freq), 3);
-            
-            % get triplet count for epoch            
-            shuffle_triplet_count(i,ch,epch) = sum(triplet_count);
-                      
+        
+        % filling in the epoch
+        npks = round(random(npks_prob_dist{ch}));
+        npks = max(npks_range(ch,1),min(npks_range(ch,2),npks)); % caps the npks to the max and min from actual
+        % discretise the peak positions
+        generated_epoch = roundNearest(random(prob_dist{ch},npks,1), df);
+        % make sure all peaks are unique
+        generated_epoch = unique(generated_epoch);
+        while length(generated_epoch) < npks
+            n = npks - length(generated_epoch);
+            tmp = roundNearest(random(prob_dist{ch},n,1), df);
+            generated_epoch = unique([generated_epoch;tmp]);
         end
+        
+        % find multiplexing
+        [triplet_count, ~, ~, ~] = multiplex_find(generated_epoch,generated_epoch, tol, max(eeg_psd.freq), 3);
+        
+        % get triplet count for epoch
+        shuffle_triplet_count(i,ch) = sum(triplet_count);
+        
     end
 end
 
 %% Single-epoch Randmoisation analysis
 
 % generate mean triplet count per channel per iteration
-shuffle_triplet_mean = mean(shuffle_triplet_count,3);  
-
-shuffle_triplet_mean_mean = mean(shuffle_triplet_mean,2);
-shuffle_triplet_mean_std = std(shuffle_triplet_mean,0,2);
+shuffle_triplet_mean = mean(shuffle_triplet_count,1);
 
 actual_triplet = cellfun(@(x) sum(x(:,2)), eeg_multiplex.triplet_count,'un', false);
 actual_triplet = cell2mat(actual_triplet);
@@ -78,7 +81,7 @@ actual_triplet_std = std(actual_triplet,0,2);
 
 % t-test with alpha = 0.01
 for i = 1:eeg_multiplex.nc
-    [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet(i,:),shuffle_triplet_mean_mean(i),'Alpha',0.01,'Tail','right');
+    [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet(i,:),shuffle_triplet_mean(i),'Alpha',0.01,'Tail','right');
 end
 
 eeg_multiplex.ttest = ttest_result;
@@ -116,9 +119,8 @@ actual_num_triplet = sumCellArray(eeg_multiplex.duo_epoch.sum_count);
 actual_mean_triplet = mean(actual_num_triplet,2);
 
 %% peak pos pdf visualisation
-prob_dist = fitdist(pks_list{1},'kernel','kernel','epanechnikov','width',0.2);
 x = min(pks_list{1}):0.05:max(pks_list{1});
-y = pdf(prob_dist,x);
+y = pdf(prob_dist{ch},x);
 plot(x,y);
 hold on
 histogram(pks_list{1},'Normalization','pdf');
@@ -129,6 +131,8 @@ y = pdf(npks_prob_dist{1},x);
 plot(x,y);
 hold on
 histogram(eeg_psd.npks(1,:),'Normalization','pdf');
+xlabel('No. of peaks')
+ylabel('Probability')
 
 %% Utilities functions
 function summed_output = sumCellArray(cArray)
