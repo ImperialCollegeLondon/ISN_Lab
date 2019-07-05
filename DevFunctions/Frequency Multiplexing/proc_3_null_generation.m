@@ -18,7 +18,8 @@ tol = 0.03; % multiplexing tolerance
 num_bins = floor(max(eeg_psd.freq)/f_width)+1;
 
 shuffle_triplet_count = zeros(N,eeg_multiplex.nc);
-shuffle_triplet_mean = zeros(N,eeg_multiplex.nc);
+shuffle_epoch = cell(N,eeg_multiplex.nc);
+
 
 % find peaks distribution
 pks_list = cell(1,eeg_multiplex.nc);
@@ -39,6 +40,7 @@ end
 
 df = round(1./(eeg.ep_sz(1)/eeg.Fs),1,'significant');
 npks_range = [min(eeg_psd.npks,[],2) max(eeg_psd.npks,[],2)];
+nc = eeg_psd.nc;
 
 parfor i = 1:N
     if mod(i,N/10) == 0
@@ -65,6 +67,8 @@ parfor i = 1:N
         
         % get triplet count for epoch
         shuffle_triplet_count(i,ch) = sum(triplet_count);
+        % save generated epochs
+        shuffle_epoch{i,ch} = generated_epoch;
         
     end
 end
