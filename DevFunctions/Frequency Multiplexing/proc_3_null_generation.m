@@ -17,8 +17,8 @@ tol = 0.03; % multiplexing tolerance
 
 num_bins = floor(max(eeg_psd.freq)/f_width)+1;
 
-shuffle_triplet_count = zeros(N,eeg_multiplex.nc);
-shuffle_epoch = cell(N,eeg_multiplex.nc);
+surrogate_triplet_count = zeros(N,eeg_multiplex.nc);
+surrogate_epoch = cell(N,eeg_multiplex.nc);
 
 
 % find peaks distribution
@@ -66,17 +66,17 @@ parfor i = 1:N
         [triplet_count, ~, ~, ~] = multiplex_find(generated_epoch,generated_epoch, tol, max(eeg_psd.freq), 3);
         
         % get triplet count for epoch
-        shuffle_triplet_count(i,ch) = sum(triplet_count);
+        surrogate_triplet_count(i,ch) = sum(triplet_count);
         % save generated epochs
-        shuffle_epoch{i,ch} = generated_epoch;
+        surrogate_epoch{i,ch} = generated_epoch;
         
     end
 end
 
-%% Single-epoch Randmoisation analysis
+%% Single-epoch Randomisation analysis
 
 % generate mean triplet count per channel per iteration
-shuffle_triplet_mean = mean(shuffle_triplet_count,1);
+surrogate_triplet_mean = mean(surrogate_triplet_count,1);
 
 actual_triplet = cellfun(@(x) sum(x(:,2)), eeg_multiplex.triplet_count,'un', false);
 actual_triplet = cell2mat(actual_triplet);
@@ -85,20 +85,17 @@ actual_triplet_std = std(actual_triplet,0,2);
 
 % t-test with alpha = 0.01
 for i = 1:eeg_multiplex.nc
-    [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet(i,:),shuffle_triplet_mean(i),'Alpha',0.01,'Tail','right');
+    [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet(i,:),surrogate_triplet_mean(i),'Alpha',0.01,'Tail','right');
 end
 
 eeg_multiplex.ttest.mean = ttest_result;
 
 % calculated total possible triplets for surrogate
-[N, nc] = size(shuffle_epoch);
+[N, nc] = size(surrogate_epoch);
 surrogate_possible_triplet = zeros(N,nc);
 parfor i = 1:N
     for ch = 1:nc
-        % show all combination of pairs
-        pair_comb = combnk(shuffle_epoch{i,ch},2);
-        sum_peak = sum(pair_comb,2);
-        surrogate_possible_triplet(i,ch) = sum(sum_peak <= 30);
+        surrogate_possible_triplet(i,ch) = numPossibleTriplet(surrogate_epoch{i,ch}, 30);
     end
 end
 
@@ -106,15 +103,13 @@ end
 actual_possible_triplet = zeros(eeg_psd.nc, eeg_psd.nepc);
 for ch = 1:eeg_psd.nc
     for epch = 1:eeg_psd.nepc
-        pair_comb = combnk(eeg_psd.pks_freq{ch,epch},2);
-        sum_peak = sum(pair_comb,2);
-        actual_possible_triplet(ch,epch) = sum(sum_peak <= 30);
+        actual_possible_triplet(ch,epch) = numPossibleTriplet(eeg_psd.pks_freq{ch,epch}, 30);
     end
 end
 
 % calculate percentage of triplet from total possible triplets
 actual_triplet_percentage = actual_triplet./actual_possible_triplet * 100;
-surrogate_triplet_percentage = shuffle_triplet_count./surrogate_possible_triplet * 100;
+surrogate_triplet_percentage = surrogate_triplet_count./surrogate_possible_triplet * 100;
 
 % t-test with alpha = 0.01
 for i = 1:eeg_multiplex.nc
@@ -122,6 +117,13 @@ for i = 1:eeg_multiplex.nc
 end
 
 eeg_multiplex.ttest.percentage = ttest_result;
+
+%% Single Epoch Mean Visualisation
+hold on
+Y = [actual_triplet_mean surrogate_triplet_mean];
+
+
+%% Single Epoch Percentage Visualisation
 
 %% Duo-epoch Randomisation
 N = 1000;
