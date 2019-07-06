@@ -43,7 +43,7 @@ npks_range = [min(eeg_psd.npks,[],2) max(eeg_psd.npks,[],2)];
 nc = eeg_psd.nc;
 
 parfor i = 1:N
-    if mod(i,N/10) == 0
+    if mod(i,round(N/10,-1)) == 0
         fprintf("Running iteration %d\n", i)
     end
     
@@ -193,14 +193,19 @@ for i = 2:N
     rand_seed(i,:) = tmp;
 end
 
-parfor i = 1:N
+for i = 1:N
+    if mod(i,round(N/10,-1)) == 0
+        fprintf("Running iteration %d\n", i)
+    end
+    
     shuffled_pks_freq = eeg_multiplex.pks_freq(:,rand_seed(i,:));
     shuffled_multiplex = struct;
     
     shuffled_multiplex = duoEpochMultiplex(shuffled_multiplex,...
-        eeg_multiplex.nc,eeg_multiplex.nepc,shuffled_pks_freq, max(eeg_psd.freq));
+        eeg_multiplex.nc,eeg_multiplex.nepc,shuffled_pks_freq, max(eeg_psd.freq),true);
     
     shuffled_num_triplet = sumCellArray(shuffled_multiplex.duo_epoch.triplet_count);
+    
     shuffled_mean_triplet(i,:) = mean(shuffled_num_triplet,2);
     
 end
