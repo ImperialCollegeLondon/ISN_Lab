@@ -34,8 +34,8 @@ end
 % find number of peak distribution
 npks_prob_dist = cell(1, eeg_multiplex.nc);
 for ch = 1:eeg_multiplex.nc
-    npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','kernel','kernel','normal','width',0.1,'support',[min(eeg_psd.npks(ch,:))-1 max(eeg_psd.npks(ch,:))+1]);
-%     npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','gamma');
+%     npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','kernel','kernel','normal','width',0.1,'support',[min(eeg_psd.npks(ch,:))-1 max(eeg_psd.npks(ch,:))+1]);
+    npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','gamma');
 end
 
 df = round(1./(eeg.ep_sz(1)/eeg.Fs),1,'significant');
@@ -88,7 +88,40 @@ for i = 1:eeg_multiplex.nc
     [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet(i,:),shuffle_triplet_mean(i),'Alpha',0.01,'Tail','right');
 end
 
-eeg_multiplex.ttest = ttest_result;
+eeg_multiplex.ttest.mean = ttest_result;
+
+% calculated total possible triplets for surrogate
+[N, nc] = size(shuffle_epoch);
+surrogate_possible_triplet = zeros(N,nc);
+parfor i = 1:N
+    for ch = 1:nc
+        % show all combination of pairs
+        pair_comb = combnk(shuffle_epoch{i,ch},2);
+        sum_peak = sum(pair_comb,2);
+        surrogate_possible_triplet(i,ch) = sum(sum_peak <= 30);
+    end
+end
+
+% calculated total possible triplet for actual
+actual_possible_triplet = zeros(eeg_psd.nc, eeg_psd.nepc);
+for ch = 1:eeg_psd.nc
+    for epch = 1:eeg_psd.nepc
+        pair_comb = combnk(eeg_psd.pks_freq{ch,epch},2);
+        sum_peak = sum(pair_comb,2);
+        actual_possible_triplet(ch,epch) = sum(sum_peak <= 30);
+    end
+end
+
+% calculate percentage of triplet from total possible triplets
+actual_triplet_percentage = actual_triplet./actual_possible_triplet * 100;
+surrogate_triplet_percentage = shuffle_triplet_count./surrogate_possible_triplet * 100;
+
+% t-test with alpha = 0.01
+for i = 1:eeg_multiplex.nc
+    [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet_percentage(i,:),mean(surrogate_triplet_percentage(:,i)),'Alpha',0.01,'Tail','right');
+end
+
+eeg_multiplex.ttest.percentage = ttest_result;
 
 %% Duo-epoch Randomisation
 N = 1000;
@@ -105,7 +138,7 @@ for i = 2:N
     rand_seed(i,:) = tmp;
 end
 
-for i = 1:N
+parfor i = 1:N
     shuffled_pks_freq = eeg_multiplex.pks_freq(:,rand_seed(i,:));
     shuffled_multiplex = struct;
     
@@ -123,20 +156,31 @@ actual_num_triplet = sumCellArray(eeg_multiplex.duo_epoch.sum_count);
 actual_mean_triplet = mean(actual_num_triplet,2);
 
 %% peak pos pdf visualisation
-x = min(pks_list{1}):0.05:max(pks_list{1});
+ch = 4;
+x = 0:0.05:max(pks_list{ch});
 y = pdf(prob_dist{ch},x);
-plot(x,y);
+histogram(pks_list{ch},'Normalization','pdf','FaceColor',[0.2 0.5 0.7],'LineWidth',1);
 hold on
-histogram(pks_list{1},'Normalization','pdf');
+plot(x,y,'r-','LineWidth',2);
+
+xlabel('Peak frequency (Hz)','FontSize',15)
+ylabel('Probability','FontSize',15)
+legend({string(eeg_psd.channels{ch}),'Kernel fit'},'FontSize',12);
+set(gca,'FontSize',14)
+hold off
 
 %% peak count pdf visualisation
-x = min(eeg_psd.npks(1,:)):1:max(eeg_psd.npks(1,:));
-y = pdf(npks_prob_dist{1},x);
-plot(x,y);
+ch = 4;
+x = min(eeg_psd.npks(ch,:)):1:max(eeg_psd.npks(ch,:));
+y = pdf(npks_prob_dist{ch},x);
+histogram(eeg_psd.npks(ch,:),'Normalization','pdf','FaceColor',[208,221,215]./256);
 hold on
-histogram(eeg_psd.npks(1,:),'Normalization','pdf');
-xlabel('No. of peaks')
-ylabel('Probability')
+plot(x,y,'-','Color',[89,78,54]./256,'LineWidth',2);
+xlabel('No. of peaks','FontSize',15)
+ylabel('Probability','FontSize',15)
+legend({string(eeg_psd.channels{ch}),'Gamma fit'},'FontSize',12);
+set(gca,'FontSize',14)
+hold off
 
 %% Utilities functions
 function summed_output = sumCellArray(cArray)
