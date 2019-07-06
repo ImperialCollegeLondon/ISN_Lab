@@ -11,7 +11,7 @@ load(['sleep_multiplex_',char(regexp(filename,'[0-9]','match')),'.mat']);
 
 %% Single-Epoch Randomisation
 f_width = 1;
-N = 1000; % number of surrogate epochs to generate
+N = 1419; % number of surrogate epochs to generate
 
 tol = 0.03; % multiplexing tolerance
 
@@ -34,7 +34,7 @@ end
 % find number of peak distribution
 npks_prob_dist = cell(1, eeg_multiplex.nc);
 for ch = 1:eeg_multiplex.nc
-%     npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','kernel','kernel','normal','width',0.1,'support',[min(eeg_psd.npks(ch,:))-1 max(eeg_psd.npks(ch,:))+1]);
+    %     npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','kernel','kernel','normal','width',0.1,'support',[min(eeg_psd.npks(ch,:))-1 max(eeg_psd.npks(ch,:))+1]);
     npks_prob_dist{ch} = fitdist(eeg_psd.npks(ch,:)','gamma');
 end
 
@@ -77,6 +77,7 @@ end
 
 % generate mean triplet count per channel per iteration
 surrogate_triplet_mean = mean(surrogate_triplet_count,1);
+surrogate_triplet_std = std(surrogate_triplet_count,0,1);
 
 actual_triplet = cellfun(@(x) sum(x(:,2)), eeg_multiplex.triplet_count,'un', false);
 actual_triplet = cell2mat(actual_triplet);
@@ -111,19 +112,68 @@ end
 actual_triplet_percentage = actual_triplet./actual_possible_triplet * 100;
 surrogate_triplet_percentage = surrogate_triplet_count./surrogate_possible_triplet * 100;
 
+actual_triplet_percentage_mean = mean(actual_triplet_percentage,2);
+actual_triplet_percentage_std = std(actual_triplet_percentage,0,2);
+surrogate_triplet_percentage_mean = mean(surrogate_triplet_percentage);
+surrogate_triplet_percentage_std = std(surrogate_triplet_percentage,0,1);
+
 % t-test with alpha = 0.01
 for i = 1:eeg_multiplex.nc
     [ttest_result.H(i), ttest_result.p(i)] = ttest(actual_triplet_percentage(i,:),mean(surrogate_triplet_percentage(:,i)),'Alpha',0.01,'Tail','right');
 end
 
+% ks-test with alpha = 0.01
+for i = 1:eeg_multiplex.nc
+    [ks_result.H(i), ks_result.p(i)] = kstest2(actual_triplet_percentage(i,:),surrogate_triplet_percentage(:,i),'Alpha',0.01,'Tail','larger');
+end
+    
 eeg_multiplex.ttest.percentage = ttest_result;
+eeg_multiplex.kstest = ks_result;
 
 %% Single Epoch Mean Visualisation
 hold on
-Y = [actual_triplet_mean surrogate_triplet_mean];
-
+X = categorical(string(eeg_multiplex.channels));
+Y = [actual_triplet_mean surrogate_triplet_mean'];
+colorA = [75,163,195]./256;
+colorB = [23,86,118]./256;
+b = bar(X,Y,'FaceColor','Flat');
+b(1).FaceColor = colorA;
+b(2).FaceColor = colorB;
+ylabel('Mean number of triplets');
+legend({'Actual','Surrogate'},'FontSize',12);
+set(gca,'FontSize',15)
 
 %% Single Epoch Percentage Visualisation
+colorA = [75,163,195]./256;
+colorB = [186,50,79]./256;
+
+for ch = 1:eeg_multiplex.nc
+    figure();
+    hold on;
+    histogram(surrogate_triplet_percentage(:,ch),'Normalization','pdf','FaceColor',colorA);
+    histogram(actual_triplet_percentage(ch,:),'Normalization','pdf','FaceColor',colorB);
+    xlabel('% of possible triplet','FontSize',15);
+    ylabel('Probability','FontSize',15);
+    legend({'Surrogate',string(eeg_multiplex.channels{ch})},'FontSize',12);
+    set(gca,'FontSize',15)
+    
+    hold off    
+end
+
+figure()
+
+hold on
+
+X = categorical(string(eeg_multiplex.channels));
+Y = [actual_triplet_percentage_mean surrogate_triplet_percentage_mean'];
+b = bar(X,Y,'FaceColor','Flat');
+b(1).FaceColor = colorB;
+b(2).FaceColor = colorA;
+ylabel('% of Possible Triplets');
+legend({'Actual','Surrogate'},'FontSize',12);
+set(gca,'FontSize',15)
+
+hold off
 
 %% Duo-epoch Randomisation
 N = 1000;
