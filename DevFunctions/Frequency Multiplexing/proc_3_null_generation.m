@@ -143,6 +143,9 @@ ylabel('Mean number of triplets');
 legend({'Actual','Surrogate'},'FontSize',12);
 set(gca,'FontSize',15)
 
+%% Clean up
+clearvars -except surrogate_* actual_* eeg* df
+
 %% Single Epoch Percentage Visualisation
 colorA = [75,163,195]./256;
 colorB = [186,50,79]./256;
