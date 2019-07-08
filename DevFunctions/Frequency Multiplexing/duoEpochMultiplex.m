@@ -1,4 +1,4 @@
-function eeg_multiplex = duoEpochMultiplex(eeg_multiplex, nc,nepc,pks_freq,maxFreq)
+function eeg_multiplex = duoEpochMultiplex(eeg_multiplex, nc,nepc,pks_freq,maxFreq, varargin)
 %Duo Epoch Multiplex Summary of this function goes here
 %   Detailed explanation goes here
 eeg_multiplex.nepc = nepc;
@@ -12,8 +12,17 @@ eeg_multiplex.duo_epoch.generated_pks = cell(nc, nepc);
 eeg_multiplex.duo_epoch.diff_count = cell(nc, nepc);
 eeg_multiplex.duo_epoch.diff_component = cell(nc, nepc);
 
+suppress = false;
+
+if ~isempty(varargin)
+    suppress = true;
+end
+
 for ch = 1:nc
-    fprintf('Evaluating channel %d\n',ch);
+    if ~suppress
+        fprintf('Evaluating channel %d\n',ch);
+    end
+    
     for epch_2 = 2:nepc
         
         epch_1 = epch_2 - 1;
