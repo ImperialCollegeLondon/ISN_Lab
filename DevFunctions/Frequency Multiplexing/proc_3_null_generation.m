@@ -143,6 +143,33 @@ ylabel('Mean number of triplets');
 legend({'Actual','Surrogate'},'FontSize',12);
 set(gca,'FontSize',15)
 
+%% peak pos pdf visualisation
+ch = 4;
+x = 0:0.05:max(pks_list{ch});
+y = pdf(prob_dist{ch},x);
+histogram(pks_list{ch},'Normalization','pdf','FaceColor',[0.2 0.5 0.7],'LineWidth',1);
+hold on
+plot(x,y,'r-','LineWidth',2);
+
+xlabel('Peak frequency (Hz)','FontSize',15)
+ylabel('Probability','FontSize',15)
+legend({string(eeg_psd.channels{ch}),'Kernel fit'},'FontSize',12);
+set(gca,'FontSize',14)
+hold off
+
+%% peak count pdf visualisation
+ch = 4;
+x = min(eeg_psd.npks(ch,:)):1:max(eeg_psd.npks(ch,:));
+y = pdf(npks_prob_dist{ch},x);
+histogram(eeg_psd.npks(ch,:),'Normalization','pdf','FaceColor',[208,221,215]./256);
+hold on
+plot(x,y,'-','Color',[89,78,54]./256,'LineWidth',2);
+xlabel('No. of peaks','FontSize',15)
+ylabel('Probability','FontSize',15)
+legend({string(eeg_psd.channels{ch}),'Gamma fit'},'FontSize',12);
+set(gca,'FontSize',14)
+hold off
+
 %% Clean up
 clearvars -except surrogate_* actual_* eeg* df
 
@@ -193,6 +220,8 @@ for i = 2:N
     rand_seed(i,:) = tmp;
 end
 
+shuffle_generated_pks_norm = zeros(N,eeg_multiplex.nc, eeg_multiplex.nepc);
+shuffle_triplet_percentage = zeros(N, eeg_multiplex.nc, eeg_multiplex.nepc);
 for i = 1:N
     if mod(i,round(N/10,-1)) == 0
         fprintf("Running iteration %d\n", i)
@@ -206,42 +235,80 @@ for i = 1:N
     
     shuffled_num_triplet = sumCellArray(shuffled_multiplex.duo_epoch.triplet_count);
     
-    shuffled_mean_triplet(i,:) = mean(shuffled_num_triplet,2);
+    possible_triplet = cell2mat(cellfun(@(x) numPossibleTriplet(x,30), ...
+        shuffled_pks_freq(:,1:end-1),'un',false));
+    possible_triplet = [zeros(4,1) possible_triplet];
+    
+    shuffle_triplet_percentage(i,:,:) = shuffled_num_triplet./possible_triplet * 100;
+    
+    shuffle_generated_pks_norm(i,:,:) = cell2mat(...
+        cellfun(@length, shuffled_multiplex.duo_epoch.generated_pks,'un', false))./ ...
+        eeg_multiplex.npks(:,rand_seed(i,:));
     
 end
 
-shuffled_std_triplet = std(shuffled_mean_triplet,1);
+%% Duo-epoch Randomisation Analysis
 
-actual_num_triplet = sumCellArray(eeg_multiplex.duo_epoch.sum_count);
-actual_mean_triplet = mean(actual_num_triplet,2);
+% calculated total possible triplet for actual
+actual_possible_triplet = zeros(eeg_psd.nc, eeg_psd.nepc);
+for ch = 1:eeg_psd.nc
+    for epch = 2:eeg_psd.nepc
+        actual_possible_triplet(ch,epch) = numPossibleTriplet(eeg_psd.pks_freq{ch,epch-1}, 30);
+    end
+end
 
-%% peak pos pdf visualisation
-ch = 4;
-x = 0:0.05:max(pks_list{ch});
-y = pdf(prob_dist{ch},x);
-histogram(pks_list{ch},'Normalization','pdf','FaceColor',[0.2 0.5 0.7],'LineWidth',1);
-hold on
-plot(x,y,'r-','LineWidth',2);
+actual_num_triplet = sumCellArray(eeg_multiplex.duo_epoch.triplet_count);
+actual_triplet_percentage = actual_num_triplet./actual_possible_triplet * 100;
+actual_triplet_percentage_mean = mean(actual_triplet_percentage(:,2:end),2);
 
-xlabel('Peak frequency (Hz)','FontSize',15)
-ylabel('Probability','FontSize',15)
-legend({string(eeg_psd.channels{ch}),'Kernel fit'},'FontSize',12);
-set(gca,'FontSize',14)
-hold off
+actual_generated_pks_norm = cell2mat(...
+        cellfun(@length, eeg_multiplex.duo_epoch.generated_pks,'un', false))./ ...
+        eeg_multiplex.npks;
+actual_generated_pks_norm_mean = mean(actual_generated_pks_norm(:,2:end),2);
 
-%% peak count pdf visualisation
-ch = 4;
-x = min(eeg_psd.npks(ch,:)):1:max(eeg_psd.npks(ch,:));
-y = pdf(npks_prob_dist{ch},x);
-histogram(eeg_psd.npks(ch,:),'Normalization','pdf','FaceColor',[208,221,215]./256);
-hold on
-plot(x,y,'-','Color',[89,78,54]./256,'LineWidth',2);
-xlabel('No. of peaks','FontSize',15)
-ylabel('Probability','FontSize',15)
-legend({string(eeg_psd.channels{ch}),'Gamma fit'},'FontSize',12);
-set(gca,'FontSize',14)
-hold off
+shuffle_triplet_percentage_mean = mean(shuffle_triplet_percentage(:,:,2:end),3);
+shuffle_generated_pks_norm_mean = mean(shuffle_generated_pks_norm(:,:,2:end),3);
 
+% t-test with alpha = 0.01
+for i = 1:eeg_multiplex.nc
+    [ttest_result.H(i), ttest_result.p(i)] = ttest2(actual_triplet_percentage(i,2:end),shuffle_triplet_percentage_mean(:,i),'Alpha',0.01,'Tail','right');
+end
+
+
+%% Duo-epoch Visualisation triplet percentage
+
+for ch = 1:eeg_psd.nc
+    fig = figure; 
+    hax = axes; 
+    hold on
+    histogram(shuffle_triplet_percentage_mean(:,ch),'Normalization','pdf');
+    SP = actual_triplet_percentage_mean(ch);
+    line([SP SP],get(hax,'YLim'),'Color',[1 0 0], 'LineStyle','--');
+    xlabel('mean % of possible triplet','FontSize',15)
+    ylabel('Probability','FontSize',15)
+    hist_legend = strcat("Shuffle ",string(eeg_psd.channels{ch}));
+    legend({hist_legend,'Actual Mean'},'FontSize',12,'Location','northwest');
+    set(gca,'FontSize',14)
+
+    hold off
+end
+
+%% Duo-epoch Visualisation generated pks
+for ch = 1:eeg_psd.nc
+    fig = figure; 
+    hax = axes; 
+    hold on
+    histogram(shuffle_generated_pks_norm_mean(:,ch),'Normalization','pdf');
+    SP = actual_generated_pks_norm_mean(ch);
+    line([SP SP],get(hax,'YLim'),'Color',[1 0 0], 'LineStyle','--');
+    xlabel('Normalised mean generated peaks','FontSize',15)
+    ylabel('Probability','FontSize',15)
+    hist_legend = strcat("Shuffle ",string(eeg_psd.channels{ch}));
+    legend({hist_legend,'Actual Mean'},'FontSize',12,'Location','north');
+    set(gca,'FontSize',14)
+
+    hold off
+end
 %% Utilities functions
 function summed_output = sumCellArray(cArray)
 
