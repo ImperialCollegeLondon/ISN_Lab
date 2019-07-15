@@ -11,7 +11,7 @@ load(['sleep_multiplex_',char(regexp(filename,'[0-9]','match')),'.mat']);
 
 %% Single-Epoch Randomisation
 f_width = 1;
-N = 1419; % number of surrogate epochs to generate
+N = 10000; % number of surrogate epochs to generate
 
 tol = 0.03; % multiplexing tolerance
 
@@ -41,6 +41,7 @@ end
 df = round(1./(eeg.ep_sz(1)/eeg.Fs),1,'significant');
 npks_range = [min(eeg_psd.npks,[],2) max(eeg_psd.npks,[],2)];
 nc = eeg_psd.nc;
+% nc = 1;
 
 parfor i = 1:N
     if mod(i,round(N/10,-1)) == 0
@@ -124,7 +125,7 @@ end
 
 % ks-test with alpha = 0.01
 for i = 1:eeg_multiplex.nc
-    [ks_result.H(i), ks_result.p(i)] = kstest2(actual_triplet_percentage(i,:),surrogate_triplet_percentage(:,i),'Alpha',0.01,'Tail','larger');
+    [ks_result.H(i), ks_result.p(i)] = kstest2(actual_triplet_percentage(i,:),surrogate_triplet_percentage(:,i),'Alpha',0.01);
 end
     
 eeg_multiplex.ttest.percentage = ttest_result;
@@ -180,8 +181,8 @@ colorB = [186,50,79]./256;
 for ch = 1:eeg_multiplex.nc
     figure();
     hold on;
-    histogram(surrogate_triplet_percentage(:,ch),'Normalization','pdf','FaceColor',colorA);
-    histogram(actual_triplet_percentage(ch,:),'Normalization','pdf','FaceColor',colorB);
+    histogram(actual_triplet_percentage(ch,:),'Normalization','pdf','FaceColor',colorB, 'BinWidth', 1);
+    histogram(surrogate_triplet_percentage(:,ch),'Normalization','pdf','FaceColor',colorA, 'BinWidth', 1);
     xlabel('% of possible triplet','FontSize',15);
     ylabel('Probability','FontSize',15);
     legend({'Surrogate',string(eeg_multiplex.channels{ch})},'FontSize',12);
